@@ -1,0 +1,19 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# Uploads directory (keep directory, ignore uploaded temporary files)
+uploads/*
+!uploads/.gitkeep
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

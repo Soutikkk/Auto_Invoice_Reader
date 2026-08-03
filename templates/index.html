@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Invoice Reader - OCR & Field Extraction</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="bg-light">
+
+    <!-- Navbar / Header -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="#">
+                <i class="bi bi-file-earmark-text-fill text-primary"></i>
+                <span>Auto Invoice Reader</span>
+            </a>
+            <span class="badge bg-primary rounded-pill fs-7">Beginner Edition</span>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="container my-4 my-md-5">
+        
+        <!-- Hero Section -->
+        <div class="text-center mb-4">
+            <h1 class="display-6 fw-bold text-dark">Automated Invoice OCR & Parser</h1>
+            <p class="text-muted lead mx-auto" style="max-width: 650px;">
+                Upload your invoice in <strong>JPG, JPEG, PNG, or PDF</strong> format. 
+                Our tool will automatically read the image, run OCR text extraction, and identify key details.
+            </p>
+        </div>
+
+        <!-- Alert Container for Dynamic Alerts -->
+        <div id="alertContainer" class="mx-auto" style="max-width: 850px;"></div>
+
+        <!-- Upload & Preview Card -->
+        <div class="card shadow-sm border-0 mb-5 mx-auto overflow-hidden" style="max-width: 850px;">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h5 class="fw-bold mb-0 text-dark">
+                    <i class="bi bi-cloud-arrow-up-fill text-primary me-2"></i>Upload Invoice
+                </h5>
+            </div>
+            <div class="card-body p-4">
+                
+                <!-- Drag and Drop Dropzone -->
+                <div id="dropZone" class="dropzone p-4 text-center rounded-3 border-2 border-dashed bg-body-tertiary position-relative">
+                    <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.pdf" class="d-none">
+                    
+                    <div id="dropZonePrompt" class="py-4">
+                        <i class="bi bi-file-earmark-arrow-up display-4 text-primary mb-3 d-block"></i>
+                        <h6 class="fw-bold mb-1">Drag and drop your invoice here</h6>
+                        <p class="text-muted small mb-3">Supports JPG, JPEG, PNG, and PDF (Max size: 16MB)</p>
+                        <button type="button" id="browseBtn" class="btn btn-outline-primary btn-sm px-4 rounded-pill">
+                            <i class="bi bi-folder2-open me-1"></i> Browse File
+                        </button>
+                    </div>
+
+                    <!-- File Preview Area -->
+                    <div id="previewArea" class="d-none py-2">
+                        <div class="preview-container mb-3 mx-auto shadow-sm rounded border overflow-hidden position-relative" style="max-width: 300px; max-height: 280px;">
+                            <img id="imagePreview" src="" alt="Invoice Preview" class="img-fluid d-none w-100 object-fit-contain" style="max-height: 280px;">
+                            <div id="pdfPreview" class="d-none bg-dark text-white p-4 text-center">
+                                <i class="bi bi-file-earmark-pdf display-1 text-danger"></i>
+                                <p class="mt-2 mb-0 fw-semibold">PDF File Selected</p>
+                            </div>
+                        </div>
+                        <div id="fileDetails" class="small text-secondary mb-3">
+                            <span id="fileName" class="fw-bold text-dark"></span> (<span id="fileSize"></span>)
+                        </div>
+                        <button type="button" id="changeFileBtn" class="btn btn-sm btn-outline-secondary rounded-pill">
+                            <i class="bi bi-arrow-repeat me-1"></i> Change File
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Process Upload Button -->
+                <div class="mt-4 text-center">
+                    <button type="button" id="uploadBtn" class="btn btn-primary btn-lg px-5 py-2 rounded-pill shadow-sm" disabled>
+                        <i class="bi bi-lightning-charge-fill me-1"></i> Extract & Process Invoice
+                    </button>
+                </div>
+
+                <!-- Processing Spinner Indicator -->
+                <div id="loadingSpinner" class="d-none text-center my-4">
+                    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-3 fw-semibold text-primary">Running Tesseract OCR & parsing fields... Please wait.</p>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Extraction Results Section -->
+        <div id="resultsSection" class="d-none mx-auto" style="max-width: 950px;">
+            
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h4 class="fw-bold text-dark mb-0">
+                    <i class="bi bi-check-circle-fill text-success me-2"></i>Extracted Invoice Details
+                </h4>
+                <div class="d-flex gap-2">
+                    <button id="downloadJsonBtn" class="btn btn-sm btn-outline-dark rounded-pill">
+                        <i class="bi bi-filetype-json me-1"></i> Download JSON
+                    </button>
+                    <button id="downloadTxtBtn" class="btn btn-sm btn-outline-dark rounded-pill">
+                        <i class="bi bi-file-earmark-text me-1"></i> Download TXT
+                    </button>
+                </div>
+            </div>
+
+            <!-- Key Fields Summary Grid -->
+            <div class="row g-3 mb-4">
+                
+                <!-- Invoice Number -->
+                <div class="col-md-4 col-sm-6">
+                    <div class="card h-100 border-0 shadow-sm card-field border-start border-primary border-4">
+                        <div class="card-body">
+                            <div class="text-uppercase text-muted small fw-bold mb-1">Invoice Number</div>
+                            <div id="resInvoiceNum" class="fs-5 fw-bold text-dark">Not Found</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Invoice Date -->
+                <div class="col-md-4 col-sm-6">
+                    <div class="card h-100 border-0 shadow-sm card-field border-start border-info border-4">
+                        <div class="card-body">
+                            <div class="text-uppercase text-muted small fw-bold mb-1">Invoice Date</div>
+                            <div id="resInvoiceDate" class="fs-5 fw-bold text-dark">Not Found</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vendor Name -->
+                <div class="col-md-4 col-sm-6">
+                    <div class="card h-100 border-0 shadow-sm card-field border-start border-secondary border-4">
+                        <div class="card-body">
+                            <div class="text-uppercase text-muted small fw-bold mb-1">Vendor / Company</div>
+                            <div id="resVendor" class="fs-5 fw-bold text-dark text-truncate">Not Found</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GST Number -->
+                <div class="col-md-4 col-sm-6">
+                    <div class="card h-100 border-0 shadow-sm card-field border-start border-warning border-4">
+                        <div class="card-body">
+                            <div class="text-uppercase text-muted small fw-bold mb-1">GST Number</div>
+                            <div id="resGst" class="fs-5 fw-bold text-dark">Not Found</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tax Amount -->
+                <div class="col-md-4 col-sm-6">
+                    <div class="card h-100 border-0 shadow-sm card-field border-start border-purple border-4">
+                        <div class="card-body">
+                            <div class="text-uppercase text-muted small fw-bold mb-1">Tax Amount</div>
+                            <div id="resTax" class="fs-5 fw-bold text-dark">Not Found</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Total Amount -->
+                <div class="col-md-4 col-sm-6">
+                    <div class="card h-100 border-0 shadow-sm card-field border-start border-success border-4">
+                        <div class="card-body">
+                            <div class="text-uppercase text-muted small fw-bold mb-1">Total Amount</div>
+                            <div id="resTotal" class="fs-4 fw-bold text-success">Not Found</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Complete Raw OCR Text Output -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 pt-3 px-4 d-flex align-items-center justify-content-between">
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="bi bi-code-square me-2 text-primary"></i>Complete Extracted OCR Text
+                    </h5>
+                    <button id="copyTextBtn" class="btn btn-sm btn-light border rounded-pill">
+                        <i class="bi bi-clipboard me-1"></i> Copy Text
+                    </button>
+                </div>
+                <div class="card-body p-4">
+                    <textarea id="rawOcrText" class="form-control font-monospace bg-light" rows="10" readonly placeholder="Extracted OCR text will appear here..."></textarea>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer mt-auto py-3 bg-white border-top text-center text-muted small">
+        <div class="container">
+            <span>Auto Invoice Reader &bull; Powered by Python Flask, Pytesseract OCR & Bootstrap 5</span>
+        </div>
+    </footer>
+
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
