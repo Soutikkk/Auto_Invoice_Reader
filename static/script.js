@@ -1,309 +1,463 @@
-// Auto Invoice Reader - Client Side JavaScript Logic
+// ============================================
+// AUTO INVOICE READER - Beginner Friendly Version
+// ============================================
 
-document.addEventListener('DOMContentLoaded', () => {
+// Wait for the page to load before running any code
+document.addEventListener('DOMContentLoaded', function() {
 
-    // DOM Elements
+    // ============================================
+    // 1. GET ALL THE HTML ELEMENTS WE NEED
+    // ============================================
+    
+    // Main drop zone where users drag files
     const dropZone = document.getElementById('dropZone');
+    
+    // Hidden file input that opens when user clicks
     const fileInput = document.getElementById('fileInput');
+    
+    // Button to browse files
     const browseBtn = document.getElementById('browseBtn');
+    
+    // The prompt text shown when no file is selected
     const dropZonePrompt = document.getElementById('dropZonePrompt');
+    
+    // Area that shows file preview
     const previewArea = document.getElementById('previewArea');
+    
+    // Image preview element
     const imagePreview = document.getElementById('imagePreview');
+    
+    // PDF preview element
     const pdfPreview = document.getElementById('pdfPreview');
+    
+    // Display file name
     const fileNameDisplay = document.getElementById('fileName');
+    
+    // Display file size
     const fileSizeDisplay = document.getElementById('fileSize');
+    
+    // Button to change the file
     const changeFileBtn = document.getElementById('changeFileBtn');
+    
+    // Button to upload the file
     const uploadBtn = document.getElementById('uploadBtn');
+    
+    // Loading spinner animation
     const loadingSpinner = document.getElementById('loadingSpinner');
+    
+    // Where alerts (messages) appear
     const alertContainer = document.getElementById('alertContainer');
+    
+    // Where results are shown
     const resultsSection = document.getElementById('resultsSection');
 
-    // Extracted Fields Elements
-    const resInvoiceNum = document.getElementById('resInvoiceNum');
-    const resInvoiceDate = document.getElementById('resInvoiceDate');
-    const resVendor = document.getElementById('resVendor');
-    const resGst = document.getElementById('resGst');
-    const resTax = document.getElementById('resTax');
-    const resTotal = document.getElementById('resTotal');
-    const rawOcrText = document.getElementById('rawOcrText');
+    // ============================================
+    // 2. SET UP OUR SETTINGS (CONFIGURATION)
+    // ============================================
+    
+    // Maximum file size: 10MB (10 * 1024 * 1024 bytes)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+    
+    // Which file types are allowed
+    const ALLOWED_TYPES = [
+        'image/jpeg',    // .jpg
+        'image/jpg',     // .jpg
+        'image/png',     // .png
+        'image/webp',    // .webp
+        'application/pdf' // .pdf
+    ];
 
-    // Action Buttons
-    const copyTextBtn = document.getElementById('copyTextBtn');
-    const downloadJsonBtn = document.getElementById('downloadJsonBtn');
-    const downloadTxtBtn = document.getElementById('downloadTxtBtn');
-
-    // Currently selected File & Extracted Data State
+    // This variable will store the file the user selects
     let selectedFile = null;
-    let currentExtractedData = null;
+    
+    // This tracks if we're currently uploading
+    let isUploading = false;
 
-    // Allowed File Extensions
-    const allowedExtensions = ['jpg', 'jpeg', 'png', 'pdf'];
+    // ============================================
+    // 3. HELPER FUNCTIONS (Small tools)
+    // ============================================
+    
+    // Convert bytes to a readable format (e.g., "2.5 MB")
+    function formatFileSize(bytes) {
+        if (bytes < 1024) {
+            return bytes + ' B';
+        } else if (bytes < 1024 * 1024) {
+            return (bytes / 1024).toFixed(1) + ' KB';
+        } else {
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+    }
 
-    // ==========================================
-    // Event Listeners for File Selection
-    // ==========================================
+    // Show a message to the user
+    function showMessage(message, type) {
+        // Create a new alert div
+        const alert = document.createElement('div');
+        alert.className = 'alert alert-' + type;
+        alert.textContent = message;
+        
+        // Add it to the alert container
+        alertContainer.appendChild(alert);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(function() {
+            if (alert.parentNode) {
+                alert.remove();
+            }
+        }, 5000);
+    }
 
-    // Trigger file dialog on browse button click
-    browseBtn.addEventListener('click', () => fileInput.click());
+    // Clear all messages
+    function clearMessages() {
+        alertContainer.innerHTML = '';
+    }
 
-    // Trigger file dialog when clicking directly on dropZone (if prompt visible)
-    dropZonePrompt.addEventListener('click', (e) => {
-        if (e.target !== browseBtn && !browseBtn.contains(e.target)) {
+    // ============================================
+    // 4. FILE VALIDATION (Check if file is okay)
+    // ============================================
+    
+    function isValidFile(file) {
+        // Check 1: Is there a file?
+        if (!file) {
+            showMessage('Please select a file.', 'warning');
+            return false;
+        }
+        
+        // Check 2: Is it a supported type?
+        if (!ALLOWED_TYPES.includes(file.type)) {
+            showMessage('Only JPG, PNG, and PDF files are allowed.', 'danger');
+            return false;
+        }
+        
+        // Check 3: Is it too big?
+        if (file.size > MAX_FILE_SIZE) {
+            const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
+            showMessage('File is too big (' + sizeInMB + 'MB). Max size is 10MB.', 'danger');
+            return false;
+        }
+        
+        // All checks passed!
+        return true;
+    }
+
+    // ============================================
+    // 5. SHOW FILE PREVIEW
+    // ============================================
+    
+    function showPreview(file) {
+        // Show file name and size
+        fileNameDisplay.textContent = file.name;
+        fileSizeDisplay.textContent = formatFileSize(file.size);
+        
+        // Hide the prompt, show the preview area
+        dropZonePrompt.style.display = 'none';
+        previewArea.style.display = 'block';
+        
+        // Check if it's an image
+        if (file.type.startsWith('image/')) {
+            // Show image preview
+            imagePreview.style.display = 'block';
+            pdfPreview.style.display = 'none';
+            
+            // Read the file as a data URL (so we can show it)
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                imagePreview.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // Check if it's a PDF
+        if (file.type === 'application/pdf') {
+            // Show PDF preview
+            pdfPreview.style.display = 'block';
+            imagePreview.style.display = 'none';
+            
+            // Read the file as a data URL
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                pdfPreview.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // Enable the upload button
+        uploadBtn.disabled = false;
+    }
+
+    // Clear everything when we want to start over
+    function clearPreview() {
+        // Hide preview, show prompt
+        previewArea.style.display = 'none';
+        dropZonePrompt.style.display = 'block';
+        
+        // Clear the images
+        imagePreview.src = '';
+        imagePreview.style.display = 'none';
+        pdfPreview.src = '';
+        pdfPreview.style.display = 'none';
+        
+        // Clear text
+        fileNameDisplay.textContent = '';
+        fileSizeDisplay.textContent = '';
+        
+        // Disable upload button
+        uploadBtn.disabled = true;
+        
+        // Clear the file
+        selectedFile = null;
+        fileInput.value = '';
+    }
+
+    // ============================================
+    // 6. HANDLE FILE SELECTION
+    // ============================================
+    
+    function handleFile(file) {
+        // Remove old messages
+        clearMessages();
+        
+        // Check if file is valid
+        if (!isValidFile(file)) {
+            clearPreview();
+            return;
+        }
+        
+        // Save the file
+        selectedFile = file;
+        
+        // Show the preview
+        showPreview(file);
+    }
+
+    // ============================================
+    // 7. DRAG AND DROP EVENTS
+    // ============================================
+    
+    // When a file is dragged over the drop zone
+    dropZone.addEventListener('dragover', function(e) {
+        e.preventDefault(); // Prevent browser from opening the file
+        dropZone.style.borderColor = '#007bff';
+        dropZone.style.backgroundColor = '#f0f8ff';
+    });
+
+    // When a file is dragged out of the drop zone
+    dropZone.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        dropZone.style.borderColor = '#dee2e6';
+        dropZone.style.backgroundColor = '#f8f9fa';
+    });
+
+    // When a file is dropped
+    dropZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        
+        // Reset styles
+        dropZone.style.borderColor = '#dee2e6';
+        dropZone.style.backgroundColor = '#f8f9fa';
+        
+        // Get the dropped file
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFile(files[0]);
+            
+            // Also update the file input (so it matches)
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(files[0]);
+            fileInput.files = dataTransfer.files;
+        }
+    });
+
+    // ============================================
+    // 8. BROWSE BUTTON AND FILE INPUT
+    // ============================================
+    
+    // Click on drop zone opens file picker
+    dropZone.addEventListener('click', function() {
+        if (!isUploading) {
             fileInput.click();
         }
     });
 
-    // Handle file selection from file input
-    fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            handleFileSelect(e.target.files[0]);
+    // Browse button opens file picker
+    browseBtn.addEventListener('click', function(e) {
+        e.stopPropagation(); // Prevent the drop zone click
+        if (!isUploading) {
+            fileInput.click();
         }
     });
 
-    // Change file button reset
-    changeFileBtn.addEventListener('click', () => {
-        resetFileSelection();
-    });
-
-    // ==========================================
-    // Drag & Drop Handling
-    // ==========================================
-
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropZone.addEventListener(eventName, (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            dropZone.classList.add('dragover');
-        }, false);
-    });
-
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            dropZone.classList.remove('dragover');
-        }, false);
-    });
-
-    dropZone.addEventListener('drop', (e) => {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-
-        if (files.length > 0) {
-            handleFileSelect(files[0]);
+    // When user selects a file via the file picker
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            handleFile(file);
         }
     });
 
-    // ==========================================
-    // File Processing & Preview Logic
-    // ==========================================
+    // Change file button
+    changeFileBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (!isUploading) {
+            clearPreview();
+            fileInput.click();
+        }
+    });
 
-    function handleFileSelect(file) {
-        const ext = file.name.split('.').pop().toLowerCase();
-
-        // Validate File Extension
-        if (!allowedExtensions.includes(ext)) {
-            showAlert(`Invalid file format '${file.name}'. Please upload a JPG, JPEG, PNG, or PDF file.`, 'danger');
-            resetFileSelection();
+    // ============================================
+    // 9. UPLOAD THE FILE TO THE SERVER
+    // ============================================
+    
+    uploadBtn.addEventListener('click', async function() {
+        // Make sure we have a file and we're not already uploading
+        if (!selectedFile || isUploading) {
             return;
         }
-
-        // Validate File Size (Max 16MB)
-        if (file.size > 16 * 1024 * 1024) {
-            showAlert(`File '${file.name}' is too large. Maximum file size allowed is 16MB.`, 'warning');
-            resetFileSelection();
-            return;
-        }
-
-        selectedFile = file;
-
-        // Display File Metadata
-        fileNameDisplay.textContent = file.name;
-        fileSizeDisplay.textContent = formatFileSize(file.size);
-
-        // Hide prompt and show preview container
-        dropZonePrompt.classList.add('d-none');
-        previewArea.classList.remove('d-none');
-
-        // Render preview based on file type
-        if (ext === 'pdf') {
-            imagePreview.classList.add('d-none');
-            pdfPreview.classList.remove('d-none');
-        } else {
-            pdfPreview.classList.add('d-none');
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                imagePreview.src = e.target.result;
-                imagePreview.classList.remove('d-none');
-            };
-            reader.readAsDataURL(file);
-        }
-
-        // Enable process button
-        uploadBtn.disabled = false;
-        clearAlerts();
-    }
-
-    function resetFileSelection() {
-        selectedFile = null;
-        fileInput.value = '';
-        dropZonePrompt.classList.remove('d-none');
-        previewArea.classList.add('d-none');
-        imagePreview.src = '';
-        imagePreview.classList.add('d-none');
-        pdfPreview.classList.add('d-none');
+        
+        // Start uploading
+        isUploading = true;
         uploadBtn.disabled = true;
-        resultsSection.classList.add('d-none');
-    }
-
-    // ==========================================
-    // Upload & OCR Processing via Fetch API
-    // ==========================================
-
-    uploadBtn.addEventListener('click', async () => {
-        if (!selectedFile) return;
-
-        // UI Updates for loading state
-        uploadBtn.disabled = true;
-        loadingSpinner.classList.remove('d-none');
-        resultsSection.classList.add('d-none');
-        clearAlerts();
-
+        loadingSpinner.style.display = 'inline-block';
+        
+        // Create a FormData object (used to send files)
         const formData = new FormData();
-        formData.append('file', selectedFile);
-
+        formData.append('invoice', selectedFile);
+        
         try {
-            const response = await fetch('/upload', {
+            // Send the file to the server
+            const response = await fetch('/api/upload-invoice', {
                 method: 'POST',
                 body: formData
             });
-
-            const data = await response.json();
-
-            if (data.success) {
-                currentExtractedData = data;
-                displayResults(data);
-                showAlert('Invoice processed successfully!', 'success');
-            } else {
-                showAlert(`Error processing invoice: ${data.error}`, 'danger');
+            
+            // Get the response as JSON
+            const result = await response.json();
+            
+            // Check if upload was successful
+            if (!response.ok) {
+                throw new Error(result.error || 'Upload failed');
             }
+            
+            // Success! Show the results
+            showMessage('Invoice processed successfully!', 'success');
+            displayResults(result);
+            
         } catch (error) {
-            console.error('Upload Error:', error);
-            showAlert('Failed to connect to server. Please ensure the Flask app is running.', 'danger');
-        } finally {
-            loadingSpinner.classList.add('d-none');
+            // Something went wrong
+            console.error('Upload error:', error);
+            showMessage('Upload failed: ' + error.message, 'danger');
+            
+            // Reset the upload state
             uploadBtn.disabled = false;
+            loadingSpinner.style.display = 'none';
+            isUploading = false;
         }
     });
 
-    // ==========================================
-    // Results Rendering
-    // ==========================================
-
+    // ============================================
+    // 10. DISPLAY THE RESULTS
+    // ============================================
+    
     function displayResults(data) {
-        const fields = data.parsed_fields || {};
-
-        resInvoiceNum.textContent = fields.invoice_number || 'Not Found';
-        resInvoiceDate.textContent = fields.invoice_date || 'Not Found';
-        resVendor.textContent = fields.vendor_name || 'Not Found';
-        resGst.textContent = fields.gst_number || 'Not Found';
-        resTax.textContent = fields.tax_amount || 'Not Found';
-        resTotal.textContent = fields.total_amount || 'Not Found';
-
-        rawOcrText.value = data.raw_text || 'No text extracted.';
-
-        resultsSection.classList.remove('d-none');
+        // Hide the loading spinner
+        loadingSpinner.style.display = 'none';
+        uploadBtn.disabled = false;
+        isUploading = false;
+        
+        // Get the container where we'll show results
+        let container = document.getElementById('resultsContainer');
+        
+        // Create it if it doesn't exist
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'resultsContainer';
+            container.className = 'mt-4 p-4 border rounded';
+            container.style.backgroundColor = '#f8f9fa';
+            resultsSection.appendChild(container);
+        }
+        
+        // Build the HTML for the results
+        let html = '<h3>Extracted Invoice Data</h3>';
+        html += '<div style="overflow-x: auto;">';
+        html += '<table style="width: 100%; border-collapse: collapse;">';
+        
+        // List of fields to display
+        const fields = [
+            { key: 'invoiceNumber', label: 'Invoice Number' },
+            { key: 'invoiceDate', label: 'Invoice Date' },
+            { key: 'dueDate', label: 'Due Date' },
+            { key: 'vendorName', label: 'Vendor Name' },
+            { key: 'vendorAddress', label: 'Vendor Address' },
+            { key: 'clientName', label: 'Client Name' },
+            { key: 'clientAddress', label: 'Client Address' },
+            { key: 'totalAmount', label: 'Total Amount' },
+            { key: 'subtotal', label: 'Subtotal' },
+            { key: 'taxAmount', label: 'Tax Amount' },
+            { key: 'currency', label: 'Currency' }
+        ];
+        
+        let hasData = false;
+        
+        // Go through each field
+        fields.forEach(function(field) {
+            const value = data[field.key];
+            
+            // If there's a value, show it
+            if (value && value !== '' && value !== null) {
+                hasData = true;
+                html += '<tr style="border-bottom: 1px solid #dee2e6;">';
+                html += '<td style="padding: 10px; font-weight: bold; width: 40%;">' + field.label + '</td>';
+                html += '<td style="padding: 10px;">' + escapeHtml(value) + '</td>';
+                html += '</tr>';
+            }
+        });
+        
+        // If no data was found
+        if (!hasData) {
+            html += '<tr><td colspan="2" style="padding: 20px; text-align: center; color: #6c757d;">';
+            html += 'No invoice data could be extracted.';
+            html += '</td></tr>';
+        }
+        
+        html += '</table>';
+        html += '</div>';
+        
+        // Add a "Process Another" button
+        html += '<div style="margin-top: 20px;">';
+        html += '<button onclick="location.reload()" class="btn btn-primary">Process Another Invoice</button>';
+        html += '</div>';
+        
+        // Show the results
+        container.innerHTML = html;
+        resultsSection.style.display = 'block';
+        
+        // Scroll to the results
         resultsSection.scrollIntoView({ behavior: 'smooth' });
     }
 
-    // ==========================================
-    // Copy & Download Handlers
-    // ==========================================
-
-    // Copy raw OCR text to clipboard
-    copyTextBtn.addEventListener('click', () => {
-        if (!rawOcrText.value) return;
-        navigator.clipboard.writeText(rawOcrText.value).then(() => {
-            const originalHTML = copyTextBtn.innerHTML;
-            copyTextBtn.innerHTML = '<i class="bi bi-check2 me-1"></i> Copied!';
-            copyTextBtn.classList.replace('btn-light', 'btn-success');
-            setTimeout(() => {
-                copyTextBtn.innerHTML = originalHTML;
-                copyTextBtn.classList.replace('btn-success', 'btn-light');
-            }, 2000);
-        }).catch(err => {
-            console.error('Copy failed', err);
-        });
-    });
-
-    // Download TXT file
-    downloadTxtBtn.addEventListener('click', () => {
-        if (!currentExtractedData) return;
-        downloadFile('/download/txt', { text: currentExtractedData.raw_text });
-    });
-
-    // Download JSON file
-    downloadJsonBtn.addEventListener('click', () => {
-        if (!currentExtractedData) return;
-        downloadFile('/download/json', { fields: currentExtractedData.parsed_fields });
-    });
-
-    // Helper to post and trigger file download
-    async function downloadFile(url, payload) {
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) throw new Error('Download failed');
-
-            const blob = await response.blob();
-            const contentDisposition = response.headers.get('Content-Disposition');
-            let filename = 'download';
-
-            if (contentDisposition && contentDisposition.includes('filename=')) {
-                filename = contentDisposition.split('filename=')[1].replace(/["']/g, '');
-            }
-
-            const downloadUrl = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = downloadUrl;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(downloadUrl);
-        } catch (err) {
-            showAlert('Failed to download file: ' + err.message, 'danger');
-        }
+    // ============================================
+    // 11. SAFETY: Prevent XSS attacks
+    // ============================================
+    
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = String(text);
+        return div.innerHTML;
     }
 
-    // ==========================================
-    // Utility Helper Functions
-    // ==========================================
+    // ============================================
+    // 12. STARTUP: Set initial state
+    // ============================================
+    
+    // Disable upload button until a file is selected
+    uploadBtn.disabled = true;
+    
+    // Hide the loading spinner
+    loadingSpinner.style.display = 'none';
+    
+    // Hide results section
+    resultsSection.style.display = 'none';
+    
+    console.log('📄 Auto Invoice Reader is ready!');
 
-    function showAlert(message, type = 'info') {
-        alertContainer.innerHTML = `
-            <div class="alert alert-${type} alert-dismissible fade show shadow-sm" role="alert">
-                <i class="bi bi-${type === 'success' ? 'check-circle-fill' : type === 'danger' ? 'exclamation-triangle-fill' : 'info-circle-fill'} me-2"></i>
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        `;
-    }
-
-    function clearAlerts() {
-        alertContainer.innerHTML = '';
-    }
-
-    function formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
-});
+}); // End of DOMContentLoaded
