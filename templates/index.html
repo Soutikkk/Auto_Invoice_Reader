@@ -14,6 +14,48 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body class="bg-light">
+<style>
+body{
+background:linear-gradient(135deg,#eef4ff,#f8fbff);
+font-family:'Inter',sans-serif;
+}
+.navbar{
+background:linear-gradient(90deg,#0f172a,#1e3a8a)!important;
+}
+.card{
+border-radius:20px;
+transition:.3s ease;
+}
+.card:hover{
+transform:translateY(-4px);
+box-shadow:0 16px 35px rgba(0,0,0,.12)!important;
+}
+.dropzone{
+border:2px dashed #4f8cff!important;
+background:#fff;
+transition:.3s;
+}
+.dropzone:hover{
+background:#f4f8ff;
+border-color:#2563eb!important;
+}
+.btn-primary{
+background:linear-gradient(90deg,#2563eb,#4f46e5);
+border:none;
+}
+.btn-primary:hover{
+transform:translateY(-2px);
+}
+.card-field{
+background:linear-gradient(180deg,#fff,#f9fbff);
+}
+textarea{
+border-radius:14px!important;
+}
+footer{
+background:#fff!important;
+}
+</style>
 
     <!-- Navbar / Header -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
