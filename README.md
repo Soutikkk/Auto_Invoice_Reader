@@ -157,7 +157,6 @@ brew install poppler
 
 | Issue / Error | Cause | Solution |
 | :--- | :--- | :--- |
-| `TesseractNotFoundError` | `pytesseract` cannot find `tesseract.exe`. | Install Tesseract OCR and add `C:\Program Files\Tesseract-OCR` to system PATH or verify binary path. |
 | `PDFInfoNotInstalledError` | Poppler is not installed or not found in PATH for PDF conversion. | Install Poppler binaries for Windows/Linux and add its `bin/` folder to system PATH, or test with JPG/PNG images. |
 | Fields show `"Not Found"` | OCR text did not match standard regex patterns. | Inspect the complete OCR text in the textarea below to see what text Tesseract recognized. Higher resolution images yield better results. |
 | `413 Request Entity Too Large` | Uploaded file exceeds 16MB limit. | Upload a smaller image or compressed PDF file. |
